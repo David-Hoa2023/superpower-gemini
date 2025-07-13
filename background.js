@@ -155,21 +155,21 @@ function captureAndSendScreenshot(tab) {
       return;
     }
     
-    // Send to Gemini tab
-    chrome.tabs.query({
-      url: 'https://gemini.google.com/*'
-    }, function(geminiTabs) {
-      if (geminiTabs.length > 0) {
-        chrome.tabs.sendMessage(geminiTabs[0].id, {
+    // Find best Gemini tab
+    findBestGeminiTabBackground(tab.windowId).then(geminiTab => {
+      if (geminiTab) {
+        chrome.tabs.sendMessage(geminiTab.id, {
           action: 'insertScreenshot',
           screenshot: screenshot
         });
-        chrome.tabs.update(geminiTabs[0].id, { active: true });
+        chrome.tabs.update(geminiTab.id, { active: true });
+        chrome.windows.update(geminiTab.windowId, { focused: true });
       } else {
-        // Open new Gemini tab
+        // Open new Gemini tab in same window
         chrome.tabs.create({
           url: 'https://gemini.google.com/app',
-          active: true
+          active: true,
+          windowId: tab.windowId
         }, function(newTab) {
           setTimeout(function() {
             chrome.tabs.sendMessage(newTab.id, {
@@ -181,6 +181,7 @@ function captureAndSendScreenshot(tab) {
       }
     });
   });
+  });
 }
 
 // Send selected text with custom prompt
@@ -191,15 +192,28 @@ function sendSelectedTextWithPrompt(text, tab) {
     if (templates.length > 0) {
       const prompt = templates[0].template.replace('{{text}}', text);
       
-      chrome.tabs.query({
-        url: 'https://gemini.google.com/*'
-      }, function(geminiTabs) {
-        if (geminiTabs.length > 0) {
-          chrome.tabs.sendMessage(geminiTabs[0].id, {
+      findBestGeminiTabBackground(tab.windowId).then(geminiTab => {
+        if (geminiTab) {
+          chrome.tabs.sendMessage(geminiTab.id, {
             action: 'insertPrompt',
             prompt: prompt
           });
-          chrome.tabs.update(geminiTabs[0].id, { active: true });
+          chrome.tabs.update(geminiTab.id, { active: true });
+          chrome.windows.update(geminiTab.windowId, { focused: true });
+        } else {
+          // Open new Gemini tab in same window
+          chrome.tabs.create({
+            url: 'https://gemini.google.com/app',
+            active: true,
+            windowId: tab.windowId
+          }, function(newTab) {
+            setTimeout(function() {
+              chrome.tabs.sendMessage(newTab.id, {
+                action: 'insertPrompt',
+                prompt: prompt
+              });
+            }, 2000);
+          });
         }
       });
     }
@@ -297,6 +311,39 @@ function summarizeText(text, sendResponse) {
     originalLength: text.length,
     summaryLength: summary.length
   });
+}
+
+// Function to find the best Gemini tab (for background script)
+async function findBestGeminiTabBackground(preferredWindowId) {
+  try {
+    // First, try to find Gemini tabs in the preferred window
+    const sameWindowGeminiTabs = await chrome.tabs.query({ 
+      url: 'https://gemini.google.com/*',
+      windowId: preferredWindowId 
+    });
+    
+    if (sameWindowGeminiTabs.length > 0) {
+      // Prefer the active tab in preferred window
+      const activeTab = sameWindowGeminiTabs.find(tab => tab.active);
+      return activeTab || sameWindowGeminiTabs[0];
+    }
+    
+    // If no Gemini tabs in preferred window, find any Gemini tab
+    const allGeminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+    
+    if (allGeminiTabs.length > 0) {
+      // Prefer active tabs
+      const activeGeminiTab = allGeminiTabs.find(tab => tab.active);
+      return activeGeminiTab || allGeminiTabs[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error finding Gemini tab:', error);
+    // Fallback to simple query
+    const tabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+    return tabs.length > 0 ? tabs[0] : null;
+  }
 }
 
 console.log('Superpower for Gemini background script loaded');

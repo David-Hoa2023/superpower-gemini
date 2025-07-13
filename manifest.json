@@ -10,7 +10,8 @@
     "clipboardWrite",
     "clipboardRead",
     "tabs",
-    "scripting"
+    "scripting",
+    "windows"
   ],
   "host_permissions": [
     "https://gemini.google.com/*"

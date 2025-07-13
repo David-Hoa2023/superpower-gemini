@@ -491,14 +491,12 @@ async function runChain(id) {
   if (!chain) return;
   
   try {
-    // Find Gemini tab
-    const geminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
-    if (geminiTabs.length === 0) {
-      alert('Please open Gemini in a tab to run the chain.');
+    // Find the best Gemini tab to use
+    const geminiTab = await findBestGeminiTab();
+    if (!geminiTab) {
+      alert('Please open Gemini (https://gemini.google.com) in a tab to run the chain.');
       return;
     }
-    
-    const geminiTab = geminiTabs[0];
     
     // Show progress
     const progressContainer = document.getElementById(`progress-${id}`);
@@ -510,8 +508,9 @@ async function runChain(id) {
       `<div class="chain-step-progress pending" id="step-${id}-${i}">${i + 1}. ${escapeHtml(step.name)}</div>`
     ).join('');
     
-    // Switch to Gemini tab
+    // Switch to Gemini tab and focus its window
     await chrome.tabs.update(geminiTab.id, { active: true });
+    await chrome.windows.update(geminiTab.windowId, { focused: true });
     
     // Run each step with delays
     for (let i = 0; i < chain.steps.length; i++) {
@@ -617,13 +616,11 @@ async function importToChat(id) {
   if (promptTemplate) {
     try {
       if (typeof chrome !== 'undefined' && chrome.tabs) {
-        // First try to find any Gemini tab
-        const geminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+        // Find the best Gemini tab to use
+        const geminiTab = await findBestGeminiTab();
         
-        if (geminiTabs.length > 0) {
-          // Use the first Gemini tab found
-          const geminiTab = geminiTabs[0];
-          console.log('Found Gemini tab:', geminiTab.id);
+        if (geminiTab) {
+          console.log('Found Gemini tab:', geminiTab.id, 'in window:', geminiTab.windowId);
           
           // Try direct script execution first (most reliable)
           try {
@@ -633,8 +630,9 @@ async function importToChat(id) {
               args: [promptTemplate]
             });
             
-            // Switch to Gemini tab
+            // Switch to Gemini tab and focus its window
             await chrome.tabs.update(geminiTab.id, { active: true });
+            await chrome.windows.update(geminiTab.windowId, { focused: true });
             
             if (window.close) {
               window.close();
@@ -653,6 +651,7 @@ async function importToChat(id) {
             
             if (response && response.success) {
               await chrome.tabs.update(geminiTab.id, { active: true });
+              await chrome.windows.update(geminiTab.windowId, { focused: true });
               if (window.close) {
                 window.close();
               }
@@ -665,6 +664,7 @@ async function importToChat(id) {
               });
               
               await chrome.tabs.update(geminiTab.id, { active: true });
+              await chrome.windows.update(geminiTab.windowId, { focused: true });
               if (window.close) {
                 window.close();
               }
@@ -714,6 +714,42 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Function to find the best Gemini tab to use
+async function findBestGeminiTab() {
+  try {
+    // Get current window information
+    const currentWindow = await chrome.windows.getCurrent();
+    
+    // First, try to find Gemini tabs in the current window
+    const sameWindowGeminiTabs = await chrome.tabs.query({ 
+      url: 'https://gemini.google.com/*',
+      windowId: currentWindow.id
+    });
+    
+    if (sameWindowGeminiTabs.length > 0) {
+      // Prefer the active tab in current window
+      const activeTab = sameWindowGeminiTabs.find(tab => tab.active);
+      return activeTab || sameWindowGeminiTabs[0];
+    }
+    
+    // If no Gemini tabs in current window, find any Gemini tab
+    const allGeminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+    
+    if (allGeminiTabs.length > 0) {
+      // Prefer active tabs
+      const activeGeminiTab = allGeminiTabs.find(tab => tab.active);
+      return activeGeminiTab || allGeminiTabs[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error finding Gemini tab:', error);
+    // Fallback to simple query
+    const tabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+    return tabs.length > 0 ? tabs[0] : null;
+  }
 }
 
 // Function to inject directly into page when content script fails

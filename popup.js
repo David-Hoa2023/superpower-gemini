@@ -44,8 +44,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   
   // Action buttons
-  document.getElementById('manage-prompts').addEventListener('click', () => {
-    chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
+  document.getElementById('manage-prompts').addEventListener('click', async () => {
+    try {
+      // Find current window and any existing Gemini tabs
+      const currentWindow = await chrome.windows.getCurrent();
+      const geminiTabs = await chrome.tabs.query({ 
+        url: 'https://gemini.google.com/*',
+        windowId: currentWindow.id 
+      });
+      
+      let targetWindowId = currentWindow.id;
+      
+      // If no Gemini tabs in current window, find any Gemini tab
+      if (geminiTabs.length === 0) {
+        const allGeminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+        if (allGeminiTabs.length > 0) {
+          targetWindowId = allGeminiTabs[0].windowId;
+        }
+      }
+      
+      // Create prompts tab in the same window as Gemini
+      chrome.tabs.create({ 
+        url: chrome.runtime.getURL('prompts.html'),
+        windowId: targetWindowId
+      });
+    } catch (error) {
+      // Fallback to creating in current window
+      chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
+    }
   });
   
   document.getElementById('export-all').addEventListener('click', exportAllConversations);
