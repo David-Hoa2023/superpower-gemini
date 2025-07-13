@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Prompt Manager - Superpower for Gemini</title>
+  <link rel="stylesheet" href="prompts.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Prompt Manager</h1>
+      <button id="add-prompt" class="primary-btn">+ New Prompt</button>
+    </header>
+    
+    <div class="search-bar">
+      <input type="text" id="search-prompts" placeholder="Search prompts...">
+      <select id="filter-category">
+        <option value="">All Categories</option>
+        <option value="utility">Utility</option>
+        <option value="language">Language</option>
+        <option value="learning">Learning</option>
+        <option value="creative">Creative</option>
+        <option value="technical">Technical</option>
+      </select>
+    </div>
+    
+    <div class="tabs">
+      <button class="tab active" data-tab="my-prompts">My Prompts</button>
+      <button class="tab" data-tab="public-prompts">Public Prompts</button>
+      <button class="tab" data-tab="prompt-chains">Prompt Chains</button>
+      <button class="tab" data-tab="history">Prompt History</button>
+    </div>
+    
+    <div class="tab-content active" id="my-prompts">
+      <div class="prompts-grid" id="my-prompts-list"></div>
+    </div>
+    
+    <div class="tab-content" id="public-prompts">
+      <div class="prompts-grid" id="public-prompts-list"></div>
+    </div>
+    
+    <div class="tab-content" id="prompt-chains">
+      <div class="chains-list" id="chains-list"></div>
+    </div>
+    
+    <div class="tab-content" id="history">
+      <div class="history-list" id="history-list"></div>
+    </div>
+  </div>
+  
+  <!-- Prompt Editor Modal -->
+  <div class="modal" id="prompt-modal">
+    <div class="modal-content">
+      <h2 id="modal-title">New Prompt</h2>
+      <form id="prompt-form">
+        <div class="form-group">
+          <label for="prompt-name">Name</label>
+          <input type="text" id="prompt-name" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="prompt-category">Category</label>
+          <select id="prompt-category">
+            <option value="utility">Utility</option>
+            <option value="language">Language</option>
+            <option value="learning">Learning</option>
+            <option value="creative">Creative</option>
+            <option value="technical">Technical</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="prompt-template">
+            Template
+            <small>Use {{variable}} for placeholders</small>
+          </label>
+          <textarea id="prompt-template" rows="6" required></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="prompt-public">
+            Share publicly
+          </label>
+        </div>
+        
+        <div class="modal-actions">
+          <button type="button" class="cancel-btn" id="cancel-prompt">Cancel</button>
+          <button type="submit" class="save-btn">Save Prompt</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <script src="persistent-storage.js"></script>
+  <script src="prompts.js"></script>
+</body>
+</html>

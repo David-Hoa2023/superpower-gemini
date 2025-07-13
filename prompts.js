@@ -1,0 +1,595 @@
+// Prompts Manager JavaScript
+
+let prompts = [];
+let publicPrompts = [];
+let promptChains = [];
+let promptHistory = [];
+let currentEditingPrompt = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadAllData();
+  setupEventListeners();
+  renderMyPrompts();
+});
+
+async function loadAllData() {
+  try {
+    // First try to load from persistent storage
+    const persistentStorage = new PersistentStorage();
+    const persistentData = await persistentStorage.loadData();
+    
+    if (persistentData) {
+      console.log('Loading prompts data from persistent storage');
+      prompts = persistentData.prompts || [];
+      promptHistory = persistentData.promptHistory || [];
+      promptChains = persistentData.promptChains || [];
+    }
+    
+    // Also load from chrome storage (fallback and current data)
+    const data = await chrome.storage.local.get(['prompts', 'publicPrompts', 'promptChains', 'promptHistory']);
+    
+    // Merge with chrome storage data (chrome storage takes precedence for newer data)
+    if (data.prompts && data.prompts.length > 0) {
+      prompts = data.prompts;
+    }
+    if (data.promptHistory && data.promptHistory.length > 0) {
+      promptHistory = data.promptHistory;
+    }
+    if (data.promptChains && data.promptChains.length > 0) {
+      promptChains = data.promptChains;
+    }
+    
+    publicPrompts = data.publicPrompts || [];
+    
+    console.log('Loaded data:', { 
+      prompts: prompts.length, 
+      promptHistory: promptHistory.length, 
+      promptChains: promptChains.length 
+    });
+  } catch (error) {
+    console.warn('Error loading data:', error);
+    // Fallback to chrome storage only
+    const data = await chrome.storage.local.get(['prompts', 'publicPrompts', 'promptChains', 'promptHistory']);
+    prompts = data.prompts || [];
+    publicPrompts = data.publicPrompts || [];
+    promptChains = data.promptChains || [];
+    promptHistory = data.promptHistory || [];
+  }
+}
+
+function setupEventListeners() {
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+      
+      tab.classList.add('active');
+      const tabId = tab.getAttribute('data-tab');
+      document.getElementById(tabId).classList.add('active');
+      
+      // Render appropriate content
+      switch(tabId) {
+        case 'my-prompts':
+          renderMyPrompts();
+          break;
+        case 'public-prompts':
+          renderPublicPrompts();
+          break;
+        case 'prompt-chains':
+          renderPromptChains();
+          break;
+        case 'history':
+          renderHistory();
+          break;
+      }
+    });
+  });
+  
+  // Add prompt button
+  document.getElementById('add-prompt').addEventListener('click', () => {
+    currentEditingPrompt = null;
+    showPromptModal();
+  });
+  
+  // Modal events
+  document.getElementById('cancel-prompt').addEventListener('click', hidePromptModal);
+  document.getElementById('prompt-form').addEventListener('submit', savePrompt);
+  
+  // Search and filter
+  document.getElementById('search-prompts').addEventListener('input', handleSearch);
+  document.getElementById('filter-category').addEventListener('change', handleFilter);
+  
+  // Event delegation for import buttons
+  document.addEventListener('click', (e) => {
+    if (e.target.dataset.action === 'import') {
+      const id = e.target.dataset.id;
+      importToChat(id);
+    }
+  });
+  
+  // Close modal on outside click
+  document.getElementById('prompt-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'prompt-modal') {
+      hidePromptModal();
+    }
+  });
+}
+
+function renderMyPrompts() {
+  const container = document.getElementById('my-prompts-list');
+  const searchTerm = document.getElementById('search-prompts').value.toLowerCase();
+  const category = document.getElementById('filter-category').value;
+  
+  let filteredPrompts = prompts.filter(prompt => {
+    const matchesSearch = prompt.name.toLowerCase().includes(searchTerm) || 
+                         prompt.template.toLowerCase().includes(searchTerm);
+    const matchesCategory = !category || prompt.category === category;
+    return matchesSearch && matchesCategory;
+  });
+  
+  container.innerHTML = filteredPrompts.map(prompt => `
+    <div class="prompt-card" data-id="${prompt.id}">
+      <h3>${escapeHtml(prompt.name)}</h3>
+      <span class="category">${prompt.category}</span>
+      <div class="template">${escapeHtml(prompt.template)}</div>
+      <div class="actions">
+        <button onclick="editPrompt('${prompt.id}')">Edit</button>
+        <button onclick="duplicatePrompt('${prompt.id}')">Duplicate</button>
+        <button data-action="import" data-id="${prompt.id}" class="import-btn">Import to Chat</button>
+        <button onclick="deletePrompt('${prompt.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+  
+  if (filteredPrompts.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #999; grid-column: 1/-1;">No prompts found</p>';
+  }
+}
+
+function renderPublicPrompts() {
+  const container = document.getElementById('public-prompts-list');
+  
+  // Simulate public prompts
+  const samplePublicPrompts = [
+    { id: 'pub1', name: 'Code Review Assistant', category: 'technical', template: 'Review this code and suggest improvements: {{code}}', author: 'Community', upvotes: 42 },
+    { id: 'pub2', name: 'Explain Like I\'m Five', category: 'learning', template: 'Explain {{concept}} in simple terms that a 5-year-old would understand', author: 'Community', upvotes: 38 },
+    { id: 'pub3', name: 'Language Translator', category: 'language', template: 'Translate the following text from {{source_language}} to {{target_language}}: {{text}}', author: 'Community', upvotes: 31 }
+  ];
+  
+  container.innerHTML = samplePublicPrompts.map(prompt => `
+    <div class="prompt-card">
+      <h3>${escapeHtml(prompt.name)}</h3>
+      <span class="category">${prompt.category}</span>
+      <div class="template">${escapeHtml(prompt.template)}</div>
+      <div style="margin-top: 8px; font-size: 12px; color: #666;">
+        By ${prompt.author} • ⬆ ${prompt.upvotes}
+      </div>
+      <div class="actions">
+        <button onclick="importPrompt('${prompt.id}')">Import</button>
+        <button data-action="import" data-id="pub_${prompt.id}" class="import-btn">Import to Chat</button>
+        <button onclick="previewPrompt('${prompt.id}')">Preview</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderPromptChains() {
+  const container = document.getElementById('chains-list');
+  
+  if (promptChains.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: #999;">
+        <p>No prompt chains created yet</p>
+        <button class="primary-btn" style="margin-top: 16px;" onclick="createPromptChain()">Create Your First Chain</button>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = promptChains.map(chain => `
+    <div class="chain-item">
+      <h3>${escapeHtml(chain.name)}</h3>
+      <p style="color: #666; margin: 8px 0;">${escapeHtml(chain.description)}</p>
+      <div class="chain-steps">
+        ${chain.steps.map((step, i) => `
+          <div class="chain-step">${i + 1}. ${escapeHtml(step.name)}</div>
+        `).join('')}
+      </div>
+      <div class="actions" style="margin-top: 12px;">
+        <button onclick="editChain('${chain.id}')">Edit</button>
+        <button onclick="runChain('${chain.id}')">Run</button>
+        <button onclick="deleteChain('${chain.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderHistory() {
+  const container = document.getElementById('history-list');
+  
+  if (promptHistory.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #999;">No prompt history yet</p>';
+    return;
+  }
+  
+  container.innerHTML = promptHistory.slice(0, 100).map(item => `
+    <div class="history-item">
+      <div class="prompt-text">${escapeHtml(item.prompt)}</div>
+      <div class="history-actions">
+        <button data-action="import" data-id="history_${item.id}" class="import-btn-small">Import</button>
+        <div class="timestamp">${new Date(item.timestamp).toLocaleString()}</div>
+        <span class="favorite" onclick="toggleFavorite('${item.id}')">${item.favorite ? '⭐' : '☆'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showPromptModal(prompt = null) {
+  const modal = document.getElementById('prompt-modal');
+  const title = document.getElementById('modal-title');
+  const form = document.getElementById('prompt-form');
+  
+  if (prompt) {
+    title.textContent = 'Edit Prompt';
+    document.getElementById('prompt-name').value = prompt.name;
+    document.getElementById('prompt-category').value = prompt.category;
+    document.getElementById('prompt-template').value = prompt.template;
+    document.getElementById('prompt-public').checked = prompt.public || false;
+  } else {
+    title.textContent = 'New Prompt';
+    form.reset();
+  }
+  
+  modal.classList.add('active');
+}
+
+function hidePromptModal() {
+  document.getElementById('prompt-modal').classList.remove('active');
+  currentEditingPrompt = null;
+}
+
+async function savePrompt(e) {
+  e.preventDefault();
+  
+  const promptData = {
+    id: currentEditingPrompt || `prompt-${Date.now()}`,
+    name: document.getElementById('prompt-name').value,
+    category: document.getElementById('prompt-category').value,
+    template: document.getElementById('prompt-template').value,
+    public: document.getElementById('prompt-public').checked,
+    created: currentEditingPrompt ? prompts.find(p => p.id === currentEditingPrompt)?.created : Date.now(),
+    updated: Date.now()
+  };
+  
+  if (currentEditingPrompt) {
+    const index = prompts.findIndex(p => p.id === currentEditingPrompt);
+    if (index !== -1) {
+      prompts[index] = promptData;
+    }
+  } else {
+    prompts.push(promptData);
+  }
+  
+  await chrome.storage.local.set({ prompts });
+  hidePromptModal();
+  renderMyPrompts();
+}
+
+window.editPrompt = function(id) {
+  const prompt = prompts.find(p => p.id === id);
+  if (prompt) {
+    currentEditingPrompt = id;
+    showPromptModal(prompt);
+  }
+};
+
+window.duplicatePrompt = async function(id) {
+  const prompt = prompts.find(p => p.id === id);
+  if (prompt) {
+    const newPrompt = {
+      ...prompt,
+      id: `prompt-${Date.now()}`,
+      name: prompt.name + ' (Copy)',
+      created: Date.now(),
+      updated: Date.now()
+    };
+    prompts.push(newPrompt);
+    await chrome.storage.local.set({ prompts });
+    renderMyPrompts();
+  }
+};
+
+window.deletePrompt = async function(id) {
+  if (confirm('Are you sure you want to delete this prompt?')) {
+    prompts = prompts.filter(p => p.id !== id);
+    await chrome.storage.local.set({ prompts });
+    renderMyPrompts();
+  }
+};
+
+window.importPrompt = async function(id) {
+  // In a real implementation, this would fetch from a server
+  alert('Prompt imported successfully!');
+};
+
+window.previewPrompt = function(id) {
+  alert('Preview functionality coming soon!');
+};
+
+window.createPromptChain = function() {
+  alert('Prompt chain editor coming soon!');
+};
+
+window.editChain = function(id) {
+  alert('Edit chain functionality coming soon!');
+};
+
+window.runChain = function(id) {
+  alert('Run chain functionality coming soon!');
+};
+
+window.deleteChain = function(id) {
+  alert('Delete chain functionality coming soon!');
+};
+
+window.toggleFavorite = async function(id) {
+  const item = promptHistory.find(h => h.id === id);
+  if (item) {
+    item.favorite = !item.favorite;
+    await chrome.storage.local.set({ promptHistory });
+    renderHistory();
+  }
+};
+
+async function importToChat(id) {
+  console.log('importToChat called with id:', id);
+  let promptTemplate = '';
+  
+  if (id.startsWith('pub_')) {
+    const publicPromptId = id.replace('pub_', '');
+    const samplePublicPrompts = [
+      { id: 'pub1', template: 'Review this code and suggest improvements: {{code}}' },
+      { id: 'pub2', template: 'Explain {{concept}} in simple terms that a 5-year-old would understand' },
+      { id: 'pub3', template: 'Translate the following text from {{source_language}} to {{target_language}}: {{text}}' }
+    ];
+    const publicPrompt = samplePublicPrompts.find(p => p.id === publicPromptId);
+    promptTemplate = publicPrompt ? publicPrompt.template : '';
+  } else if (id.startsWith('history_')) {
+    const historyId = id.replace('history_', '');
+    const historyItem = promptHistory.find(h => h.id === historyId);
+    promptTemplate = historyItem ? historyItem.prompt : '';
+  } else {
+    const prompt = prompts.find(p => p.id === id);
+    promptTemplate = prompt ? prompt.template : '';
+  }
+  
+  if (promptTemplate) {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        // First try to find any Gemini tab
+        const geminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+        
+        if (geminiTabs.length > 0) {
+          // Use the first Gemini tab found
+          const geminiTab = geminiTabs[0];
+          console.log('Found Gemini tab:', geminiTab.id);
+          
+          // Try direct script execution first (most reliable)
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: geminiTab.id },
+              func: insertPromptDirectly,
+              args: [promptTemplate]
+            });
+            
+            // Switch to Gemini tab
+            await chrome.tabs.update(geminiTab.id, { active: true });
+            
+            if (window.close) {
+              window.close();
+            }
+            return;
+          } catch (directError) {
+            console.log('Direct script method failed, trying content script...', directError);
+          }
+          
+          // Fallback: Try content script method
+          try {
+            const response = await chrome.tabs.sendMessage(geminiTab.id, {
+              action: 'insertPrompt',
+              prompt: promptTemplate
+            });
+            
+            if (response && response.success) {
+              await chrome.tabs.update(geminiTab.id, { active: true });
+              if (window.close) {
+                window.close();
+              }
+            } else {
+              // Final fallback: direct script injection
+              await chrome.scripting.executeScript({
+                target: { tabId: geminiTab.id },
+                func: insertPromptDirectly,
+                args: [promptTemplate]
+              });
+              
+              await chrome.tabs.update(geminiTab.id, { active: true });
+              if (window.close) {
+                window.close();
+              }
+            }
+          } catch (scriptError) {
+            console.error('All methods failed:', scriptError);
+            
+            // Ultimate fallback: just copy to clipboard and give instructions
+            try {
+              await navigator.clipboard.writeText(promptTemplate);
+              alert('Automatic insertion failed, but prompt is copied to clipboard.\n\nPlease:\n1. Go to your Gemini tab\n2. Click in the chat input\n3. Press Ctrl+V (or Cmd+V) to paste\n4. Press Enter to send');
+            } catch (finalError) {
+              alert('Could not import prompt automatically.\n\nPrompt text:\n' + promptTemplate + '\n\nPlease copy this text and paste it manually into Gemini.');
+            }
+          }
+        } else {
+          alert('Please open Gemini (https://gemini.google.com) in a tab to import prompts.');
+        }
+      } else {
+        // Not in extension context, just show the prompt
+        alert('Prompt text:\n' + promptTemplate + '\n\nPlease copy this text and paste it into Gemini.');
+      }
+    } catch (error) {
+      console.error('Error importing to chat:', error);
+      alert('Error importing prompt. Here\'s the text to copy manually:\n\n' + promptTemplate);
+    }
+  } else {
+    alert('No prompt template found for the selected item.');
+  }
+};
+
+function handleSearch(e) {
+  const activeTab = document.querySelector('.tab.active').getAttribute('data-tab');
+  if (activeTab === 'my-prompts') {
+    renderMyPrompts();
+  }
+}
+
+function handleFilter(e) {
+  const activeTab = document.querySelector('.tab.active').getAttribute('data-tab');
+  if (activeTab === 'my-prompts') {
+    renderMyPrompts();
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Function to inject directly into page when content script fails
+function insertPromptDirectly(prompt) {
+  console.log('Direct injection attempt with prompt:', prompt);
+  
+  // Multiple selectors to find Gemini's input field
+  const selectors = [
+    'textarea[placeholder*="Enter a prompt"]',
+    'textarea[placeholder*="message"]',
+    'div[contenteditable="true"][role="textbox"]',
+    'div[contenteditable="true"][data-placeholder]',
+    'textarea',
+    '[contenteditable="true"]',
+    'div[role="textbox"]',
+    'input[type="text"]'
+  ];
+  
+  let inputField = null;
+  for (const selector of selectors) {
+    inputField = document.querySelector(selector);
+    if (inputField) {
+      console.log('Found input field with selector:', selector, inputField);
+      break;
+    }
+  }
+  
+  if (!inputField) {
+    // Last resort: look for any visible input-like element
+    const allInputs = document.querySelectorAll('textarea, input, [contenteditable="true"]');
+    for (const el of allInputs) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0 && !el.disabled && !el.readonly) {
+        inputField = el;
+        console.log('Found visible input field:', inputField);
+        break;
+      }
+    }
+  }
+  
+  if (inputField) {
+    console.log('Inserting into field:', inputField.tagName, inputField);
+    
+    // Clear existing content first
+    if (inputField.tagName === 'TEXTAREA' || inputField.tagName === 'INPUT') {
+      inputField.value = '';
+    } else {
+      inputField.textContent = '';
+      inputField.innerHTML = '';
+    }
+    
+    // Wait a moment then insert
+    setTimeout(() => {
+      if (inputField.tagName === 'TEXTAREA' || inputField.tagName === 'INPUT') {
+        inputField.value = prompt;
+      } else {
+        // For contenteditable divs
+        inputField.textContent = prompt;
+        if (!inputField.textContent) {
+          inputField.innerHTML = prompt.replace(/\n/g, '<br>');
+        }
+      }
+      
+      // Focus first
+      inputField.focus();
+      
+      // Trigger comprehensive events
+      const events = [
+        new Event('focus', { bubbles: true }),
+        new Event('input', { bubbles: true }),
+        new Event('change', { bubbles: true }),
+        new Event('keyup', { bubbles: true }),
+        new Event('keydown', { bubbles: true }),
+        new Event('paste', { bubbles: true }),
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+        new KeyboardEvent('keyup', { key: 'Enter', bubbles: true })
+      ];
+      
+      events.forEach(event => {
+        try {
+          inputField.dispatchEvent(event);
+        } catch (e) {
+          console.warn('Event dispatch failed:', e);
+        }
+      });
+      
+      // Also try InputEvent with more detail
+      try {
+        const inputEvent = new InputEvent('input', {
+          bubbles: true,
+          cancelable: true,
+          inputType: 'insertText',
+          data: prompt
+        });
+        inputField.dispatchEvent(inputEvent);
+      } catch (e) {
+        console.warn('InputEvent failed:', e);
+      }
+      
+      // Set cursor position
+      setTimeout(() => {
+        inputField.focus();
+        if (inputField.tagName === 'TEXTAREA' || inputField.tagName === 'INPUT') {
+          inputField.setSelectionRange(inputField.value.length, inputField.value.length);
+        } else {
+          // For contenteditable, move cursor to end
+          try {
+            const range = document.createRange();
+            const selection = window.getSelection();
+            range.selectNodeContents(inputField);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } catch (e) {
+            console.warn('Could not set cursor position:', e);
+          }
+        }
+      }, 50);
+      
+    }, 50);
+    
+    console.log('Prompt insertion initiated');
+    return true;
+  } else {
+    console.warn('No input field found for direct injection');
+    console.log('Available elements:', document.querySelectorAll('textarea, input, [contenteditable="true"]'));
+    return false;
+  }
+}
