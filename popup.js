@@ -1,5 +1,41 @@
 // Popup Script
 
+// Function to find the best Gemini tab to use
+async function findBestGeminiTab() {
+  try {
+    // Get current window information
+    const currentWindow = await chrome.windows.getCurrent();
+    
+    // First, try to find Gemini tabs in the current window
+    const sameWindowGeminiTabs = await chrome.tabs.query({ 
+      url: 'https://gemini.google.com/*',
+      windowId: currentWindow.id
+    });
+    
+    if (sameWindowGeminiTabs.length > 0) {
+      // Prefer the active tab in current window
+      const activeTab = sameWindowGeminiTabs.find(tab => tab.active);
+      return activeTab || sameWindowGeminiTabs[0];
+    }
+    
+    // If no Gemini tabs in current window, find any Gemini tab
+    const allGeminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+    
+    if (allGeminiTabs.length > 0) {
+      // Prefer active tabs
+      const activeGeminiTab = allGeminiTabs.find(tab => tab.active);
+      return activeGeminiTab || allGeminiTabs[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error finding Gemini tab:', error);
+    // Fallback to simple query
+    const tabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+    return tabs.length > 0 ? tabs[0] : null;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Load current settings
   const settings = await chrome.storage.sync.get('settings');
@@ -126,43 +162,65 @@ async function loadStatistics() {
 }
 
 async function exportAllConversations() {
-  const data = await chrome.storage.local.get(['conversations', 'folders']);
-  const exportData = {
-    version: '1.0',
-    exportDate: new Date().toISOString(),
-    conversations: data.conversations || {},
-    folders: data.folders || {}
-  };
-  
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  
-  chrome.downloads.download({
-    url: url,
-    filename: `gemini-conversations-${Date.now()}.json`,
-    saveAs: true
-  });
+  try {
+    const data = await chrome.storage.local.get(['conversations', 'folders']);
+    const exportData = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      conversations: data.conversations || {},
+      folders: data.folders || {}
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    await chrome.downloads.download({
+      url: url,
+      filename: `gemini-conversations-${Date.now()}.json`,
+      saveAs: true
+    });
+    
+    // Keep focus on Gemini window after download
+    const geminiTab = await findBestGeminiTab();
+    if (geminiTab) {
+      await chrome.windows.update(geminiTab.windowId, { focused: true });
+    }
+  } catch (error) {
+    console.error('Export failed:', error);
+    alert('Export failed: ' + error.message);
+  }
 }
 
 async function backupData() {
-  const data = await chrome.storage.local.get();
-  const syncData = await chrome.storage.sync.get();
-  
-  const backup = {
-    version: '1.0',
-    backupDate: new Date().toISOString(),
-    local: data,
-    sync: syncData
-  };
-  
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  
-  chrome.downloads.download({
-    url: url,
-    filename: `gemini-superpower-backup-${Date.now()}.json`,
-    saveAs: true
-  });
+  try {
+    const data = await chrome.storage.local.get();
+    const syncData = await chrome.storage.sync.get();
+    
+    const backup = {
+      version: '1.0',
+      backupDate: new Date().toISOString(),
+      local: data,
+      sync: syncData
+    };
+    
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    await chrome.downloads.download({
+      url: url,
+      filename: `gemini-superpower-backup-${Date.now()}.json`,
+      saveAs: true
+    });
+    
+    // Keep focus on Gemini window after download
+    const geminiTab = await findBestGeminiTab();
+    if (geminiTab) {
+      await chrome.windows.update(geminiTab.windowId, { focused: true });
+    }
+  } catch (error) {
+    console.error('Backup failed:', error);
+    alert('Backup failed: ' + error.message);
+  }
 }
 
 async function restoreData() {
@@ -192,6 +250,13 @@ async function restoreData() {
         }
         
         alert('Data restored successfully!');
+        
+        // Focus Gemini window before closing popup
+        const geminiTab = await findBestGeminiTab();
+        if (geminiTab) {
+          await chrome.windows.update(geminiTab.windowId, { focused: true });
+        }
+        
         window.close();
       }
     } catch (error) {
@@ -206,6 +271,12 @@ async function exportPersistentData() {
   try {
     const persistentStorage = new PersistentStorage();
     await persistentStorage.exportData();
+    
+    // Keep focus on Gemini window after download
+    const geminiTab = await findBestGeminiTab();
+    if (geminiTab) {
+      await chrome.windows.update(geminiTab.windowId, { focused: true });
+    }
   } catch (error) {
     alert('Export failed: ' + error.message);
   }
@@ -225,6 +296,13 @@ async function importPersistentData() {
       const data = await persistentStorage.importData(file);
       
       alert('Data imported successfully!\n\nPlease refresh any open Gemini tabs to see the changes.');
+      
+      // Focus Gemini window before closing popup
+      const geminiTab = await findBestGeminiTab();
+      if (geminiTab) {
+        await chrome.windows.update(geminiTab.windowId, { focused: true });
+      }
+      
       window.close();
     } catch (error) {
       alert('Import failed: ' + error.message);
