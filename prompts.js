@@ -105,11 +105,38 @@ function setupEventListeners() {
   document.getElementById('search-prompts').addEventListener('input', handleSearch);
   document.getElementById('filter-category').addEventListener('change', handleFilter);
   
-  // Event delegation for import buttons
+  // Event delegation for import buttons and other actions
   document.addEventListener('click', (e) => {
-    if (e.target.dataset.action === 'import') {
-      const id = e.target.dataset.id;
-      importToChat(id);
+    const action = e.target.dataset.action;
+    const id = e.target.dataset.id;
+    
+    if (action) {
+      console.log('Action clicked:', action, 'ID:', id);
+    }
+    
+    switch (action) {
+      case 'import':
+        importToChat(id);
+        break;
+      case 'create-chain':
+        console.log('Creating chain...');
+        createPromptChain();
+        break;
+      case 'run-chain':
+        runChain(id);
+        break;
+      case 'edit-chain':
+        editChain(id);
+        break;
+      case 'duplicate-chain':
+        duplicateChain(id);
+        break;
+      case 'delete-chain':
+        deleteChain(id);
+        break;
+      case 'remove-step':
+        removeChainStep(e.target);
+        break;
     }
   });
   
@@ -193,7 +220,7 @@ function renderPromptChains() {
       <div style="text-align: center; padding: 40px; color: #999;">
         <p>No prompt chains created yet</p>
         <p style="margin: 16px 0; font-size: 14px;">Prompt chains let you run multiple prompts in sequence, with each step building on the previous response.</p>
-        <button class="primary-btn" style="margin-top: 16px;" onclick="createPromptChain()">Create Your First Chain</button>
+        <button class="primary-btn" data-action="create-chain" style="margin-top: 16px;">Create Your First Chain</button>
       </div>
     `;
     return;
@@ -213,10 +240,10 @@ function renderPromptChains() {
         <div id="progress-steps-${chain.id}"></div>
       </div>
       <div class="actions" style="margin-top: 12px;">
-        <button class="chain-run-btn" onclick="runChain('${chain.id}')">▶ Run Chain</button>
-        <button onclick="editChain('${chain.id}')">Edit</button>
-        <button onclick="duplicateChain('${chain.id}')">Duplicate</button>
-        <button onclick="deleteChain('${chain.id}')">Delete</button>
+        <button class="chain-run-btn" data-action="run-chain" data-id="${chain.id}">▶ Run Chain</button>
+        <button data-action="edit-chain" data-id="${chain.id}">Edit</button>
+        <button data-action="duplicate-chain" data-id="${chain.id}">Duplicate</button>
+        <button data-action="delete-chain" data-id="${chain.id}">Delete</button>
       </div>
     </div>
   `).join('');
@@ -267,9 +294,14 @@ function hidePromptModal() {
 }
 
 function showChainModal(chain = null) {
+  console.log('showChainModal called with chain:', chain);
   const modal = document.getElementById('chain-modal');
   const title = document.getElementById('chain-modal-title');
   const form = document.getElementById('chain-form');
+  
+  console.log('Modal element found:', modal);
+  console.log('Title element found:', title);
+  console.log('Form element found:', form);
   
   if (chain) {
     title.textContent = 'Edit Prompt Chain';
@@ -282,7 +314,7 @@ function showChainModal(chain = null) {
       <div class="chain-step-item">
         <input type="text" placeholder="Step name" class="step-name" value="${escapeHtml(step.name)}" required>
         <textarea placeholder="Step prompt template" class="step-template" rows="3" required>${escapeHtml(step.template)}</textarea>
-        <button type="button" class="remove-step-btn" onclick="removeChainStep(this)">Remove</button>
+        <button type="button" class="remove-step-btn" data-action="remove-step">Remove</button>
       </div>
     `).join('');
   } else {
@@ -295,7 +327,7 @@ function showChainModal(chain = null) {
       <div class="chain-step-item">
         <input type="text" placeholder="Step name" class="step-name" required>
         <textarea placeholder="Step prompt template" class="step-template" rows="3" required></textarea>
-        <button type="button" class="remove-step-btn" onclick="removeChainStep(this)">Remove</button>
+        <button type="button" class="remove-step-btn" data-action="remove-step">Remove</button>
       </div>
     `;
   }
@@ -320,14 +352,14 @@ function addChainStep() {
   container.appendChild(newStep);
 }
 
-window.removeChainStep = function(button) {
+function removeChainStep(button) {
   const container = document.getElementById('chain-steps-container');
   if (container.children.length > 1) {
     button.parentElement.remove();
   } else {
     alert('A chain must have at least one step.');
   }
-};
+}
 
 async function saveChain(e) {
   e.preventDefault();
@@ -440,20 +472,21 @@ window.previewPrompt = function(id) {
 
 let currentEditingChain = null;
 
-window.createPromptChain = function() {
+function createPromptChain() {
+  console.log('createPromptChain function called');
   currentEditingChain = null;
   showChainModal();
-};
+}
 
-window.editChain = function(id) {
+function editChain(id) {
   const chain = promptChains.find(c => c.id === id);
   if (chain) {
     currentEditingChain = id;
     showChainModal(chain);
   }
-};
+}
 
-window.runChain = async function(id) {
+async function runChain(id) {
   const chain = promptChains.find(c => c.id === id);
   if (!chain) return;
   
@@ -526,7 +559,7 @@ window.runChain = async function(id) {
   }
 };
 
-window.duplicateChain = async function(id) {
+async function duplicateChain(id) {
   const chain = promptChains.find(c => c.id === id);
   if (chain) {
     const newChain = {
@@ -540,15 +573,15 @@ window.duplicateChain = async function(id) {
     await chrome.storage.local.set({ promptChains });
     renderPromptChains();
   }
-};
+}
 
-window.deleteChain = async function(id) {
+async function deleteChain(id) {
   if (confirm('Are you sure you want to delete this prompt chain?')) {
     promptChains = promptChains.filter(c => c.id !== id);
     await chrome.storage.local.set({ promptChains });
     renderPromptChains();
   }
-};
+}
 
 window.toggleFavorite = async function(id) {
   const item = promptHistory.find(h => h.id === id);
