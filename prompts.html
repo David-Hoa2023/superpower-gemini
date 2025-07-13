@@ -92,6 +92,41 @@
     </div>
   </div>
   
+  <!-- Chain Editor Modal -->
+  <div class="modal" id="chain-modal">
+    <div class="modal-content">
+      <h2 id="chain-modal-title">Create Prompt Chain</h2>
+      <form id="chain-form">
+        <div class="form-group">
+          <label for="chain-name">Chain Name</label>
+          <input type="text" id="chain-name" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="chain-description">Description</label>
+          <textarea id="chain-description" rows="3"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Chain Steps</label>
+          <div id="chain-steps-container">
+            <div class="chain-step-item">
+              <input type="text" placeholder="Step name" class="step-name" required>
+              <textarea placeholder="Step prompt template" class="step-template" rows="3" required></textarea>
+              <button type="button" class="remove-step-btn" onclick="removeChainStep(this)">Remove</button>
+            </div>
+          </div>
+          <button type="button" id="add-step-btn" class="secondary-btn">+ Add Step</button>
+        </div>
+        
+        <div class="modal-actions">
+          <button type="button" class="cancel-btn" id="cancel-chain">Cancel</button>
+          <button type="submit" class="save-btn">Save Chain</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
   <script src="persistent-storage.js"></script>
   <script src="prompts.js"></script>
 </body>

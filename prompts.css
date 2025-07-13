@@ -427,3 +427,113 @@ h1 {
     background: #2d8e47;
   }
 }
+
+/* Chain Editor Styles */
+.chain-step-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #fafafa;
+}
+
+.chain-step-item .step-name {
+  width: 100%;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.chain-step-item .step-template {
+  width: 100%;
+  margin-bottom: 8px;
+  font-family: monospace;
+}
+
+.remove-step-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.remove-step-btn:hover {
+  background: #c82333;
+}
+
+.secondary-btn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.secondary-btn:hover {
+  background: #5a6268;
+}
+
+/* Chain Display Styles */
+.chain-item {
+  position: relative;
+}
+
+.chain-run-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.chain-run-btn:hover {
+  background: #218838;
+}
+
+.chain-progress {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 8px;
+  margin-top: 8px;
+  display: none;
+}
+
+.chain-progress.active {
+  display: block;
+}
+
+.chain-step-progress {
+  padding: 4px 8px;
+  margin: 4px 0;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.chain-step-progress.pending {
+  background: #e9ecef;
+  color: #6c757d;
+}
+
+.chain-step-progress.running {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.chain-step-progress.completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.chain-step-progress.error {
+  background: #f8d7da;
+  color: #721c24;
+}

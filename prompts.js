@@ -96,6 +96,11 @@ function setupEventListeners() {
   document.getElementById('cancel-prompt').addEventListener('click', hidePromptModal);
   document.getElementById('prompt-form').addEventListener('submit', savePrompt);
   
+  // Chain modal events
+  document.getElementById('cancel-chain').addEventListener('click', hideChainModal);
+  document.getElementById('chain-form').addEventListener('submit', saveChain);
+  document.getElementById('add-step-btn').addEventListener('click', addChainStep);
+  
   // Search and filter
   document.getElementById('search-prompts').addEventListener('input', handleSearch);
   document.getElementById('filter-category').addEventListener('change', handleFilter);
@@ -112,6 +117,12 @@ function setupEventListeners() {
   document.getElementById('prompt-modal').addEventListener('click', (e) => {
     if (e.target.id === 'prompt-modal') {
       hidePromptModal();
+    }
+  });
+  
+  document.getElementById('chain-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'chain-modal') {
+      hideChainModal();
     }
   });
 }
@@ -181,6 +192,7 @@ function renderPromptChains() {
     container.innerHTML = `
       <div style="text-align: center; padding: 40px; color: #999;">
         <p>No prompt chains created yet</p>
+        <p style="margin: 16px 0; font-size: 14px;">Prompt chains let you run multiple prompts in sequence, with each step building on the previous response.</p>
         <button class="primary-btn" style="margin-top: 16px;" onclick="createPromptChain()">Create Your First Chain</button>
       </div>
     `;
@@ -188,17 +200,22 @@ function renderPromptChains() {
   }
   
   container.innerHTML = promptChains.map(chain => `
-    <div class="chain-item">
+    <div class="chain-item" id="chain-${chain.id}">
       <h3>${escapeHtml(chain.name)}</h3>
-      <p style="color: #666; margin: 8px 0;">${escapeHtml(chain.description)}</p>
+      <p style="color: #666; margin: 8px 0;">${escapeHtml(chain.description || 'No description')}</p>
       <div class="chain-steps">
         ${chain.steps.map((step, i) => `
           <div class="chain-step">${i + 1}. ${escapeHtml(step.name)}</div>
         `).join('')}
       </div>
+      <div class="chain-progress" id="progress-${chain.id}">
+        <div class="chain-progress-title">Execution Progress:</div>
+        <div id="progress-steps-${chain.id}"></div>
+      </div>
       <div class="actions" style="margin-top: 12px;">
+        <button class="chain-run-btn" onclick="runChain('${chain.id}')">▶ Run Chain</button>
         <button onclick="editChain('${chain.id}')">Edit</button>
-        <button onclick="runChain('${chain.id}')">Run</button>
+        <button onclick="duplicateChain('${chain.id}')">Duplicate</button>
         <button onclick="deleteChain('${chain.id}')">Delete</button>
       </div>
     </div>
@@ -247,6 +264,110 @@ function showPromptModal(prompt = null) {
 function hidePromptModal() {
   document.getElementById('prompt-modal').classList.remove('active');
   currentEditingPrompt = null;
+}
+
+function showChainModal(chain = null) {
+  const modal = document.getElementById('chain-modal');
+  const title = document.getElementById('chain-modal-title');
+  const form = document.getElementById('chain-form');
+  
+  if (chain) {
+    title.textContent = 'Edit Prompt Chain';
+    document.getElementById('chain-name').value = chain.name;
+    document.getElementById('chain-description').value = chain.description || '';
+    
+    // Load chain steps
+    const container = document.getElementById('chain-steps-container');
+    container.innerHTML = chain.steps.map(step => `
+      <div class="chain-step-item">
+        <input type="text" placeholder="Step name" class="step-name" value="${escapeHtml(step.name)}" required>
+        <textarea placeholder="Step prompt template" class="step-template" rows="3" required>${escapeHtml(step.template)}</textarea>
+        <button type="button" class="remove-step-btn" onclick="removeChainStep(this)">Remove</button>
+      </div>
+    `).join('');
+  } else {
+    title.textContent = 'Create Prompt Chain';
+    form.reset();
+    
+    // Reset to one empty step
+    const container = document.getElementById('chain-steps-container');
+    container.innerHTML = `
+      <div class="chain-step-item">
+        <input type="text" placeholder="Step name" class="step-name" required>
+        <textarea placeholder="Step prompt template" class="step-template" rows="3" required></textarea>
+        <button type="button" class="remove-step-btn" onclick="removeChainStep(this)">Remove</button>
+      </div>
+    `;
+  }
+  
+  modal.classList.add('active');
+}
+
+function hideChainModal() {
+  document.getElementById('chain-modal').classList.remove('active');
+  currentEditingChain = null;
+}
+
+function addChainStep() {
+  const container = document.getElementById('chain-steps-container');
+  const newStep = document.createElement('div');
+  newStep.className = 'chain-step-item';
+  newStep.innerHTML = `
+    <input type="text" placeholder="Step name" class="step-name" required>
+    <textarea placeholder="Step prompt template" class="step-template" rows="3" required></textarea>
+    <button type="button" class="remove-step-btn" onclick="removeChainStep(this)">Remove</button>
+  `;
+  container.appendChild(newStep);
+}
+
+window.removeChainStep = function(button) {
+  const container = document.getElementById('chain-steps-container');
+  if (container.children.length > 1) {
+    button.parentElement.remove();
+  } else {
+    alert('A chain must have at least one step.');
+  }
+};
+
+async function saveChain(e) {
+  e.preventDefault();
+  
+  const name = document.getElementById('chain-name').value;
+  const description = document.getElementById('chain-description').value;
+  
+  // Collect steps
+  const stepItems = document.querySelectorAll('.chain-step-item');
+  const steps = Array.from(stepItems).map(item => ({
+    name: item.querySelector('.step-name').value,
+    template: item.querySelector('.step-template').value
+  }));
+  
+  if (steps.length === 0) {
+    alert('Please add at least one step to the chain.');
+    return;
+  }
+  
+  const chainData = {
+    id: currentEditingChain || `chain-${Date.now()}`,
+    name,
+    description,
+    steps,
+    created: currentEditingChain ? promptChains.find(c => c.id === currentEditingChain)?.created : Date.now(),
+    updated: Date.now()
+  };
+  
+  if (currentEditingChain) {
+    const index = promptChains.findIndex(c => c.id === currentEditingChain);
+    if (index !== -1) {
+      promptChains[index] = chainData;
+    }
+  } else {
+    promptChains.push(chainData);
+  }
+  
+  await chrome.storage.local.set({ promptChains });
+  hideChainModal();
+  renderPromptChains();
 }
 
 async function savePrompt(e) {
@@ -317,20 +438,116 @@ window.previewPrompt = function(id) {
   alert('Preview functionality coming soon!');
 };
 
+let currentEditingChain = null;
+
 window.createPromptChain = function() {
-  alert('Prompt chain editor coming soon!');
+  currentEditingChain = null;
+  showChainModal();
 };
 
 window.editChain = function(id) {
-  alert('Edit chain functionality coming soon!');
+  const chain = promptChains.find(c => c.id === id);
+  if (chain) {
+    currentEditingChain = id;
+    showChainModal(chain);
+  }
 };
 
-window.runChain = function(id) {
-  alert('Run chain functionality coming soon!');
+window.runChain = async function(id) {
+  const chain = promptChains.find(c => c.id === id);
+  if (!chain) return;
+  
+  try {
+    // Find Gemini tab
+    const geminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
+    if (geminiTabs.length === 0) {
+      alert('Please open Gemini in a tab to run the chain.');
+      return;
+    }
+    
+    const geminiTab = geminiTabs[0];
+    
+    // Show progress
+    const progressContainer = document.getElementById(`progress-${id}`);
+    const progressSteps = document.getElementById(`progress-steps-${id}`);
+    progressContainer.classList.add('active');
+    
+    // Initialize progress display
+    progressSteps.innerHTML = chain.steps.map((step, i) => 
+      `<div class="chain-step-progress pending" id="step-${id}-${i}">${i + 1}. ${escapeHtml(step.name)}</div>`
+    ).join('');
+    
+    // Switch to Gemini tab
+    await chrome.tabs.update(geminiTab.id, { active: true });
+    
+    // Run each step with delays
+    for (let i = 0; i < chain.steps.length; i++) {
+      const step = chain.steps[i];
+      const stepElement = document.getElementById(`step-${id}-${i}`);
+      
+      try {
+        // Mark as running
+        stepElement.className = 'chain-step-progress running';
+        stepElement.textContent = `${i + 1}. ${step.name} - Running...`;
+        
+        // Execute the prompt
+        await chrome.scripting.executeScript({
+          target: { tabId: geminiTab.id },
+          func: insertPromptDirectly,
+          args: [step.template]
+        });
+        
+        // Mark as completed
+        stepElement.className = 'chain-step-progress completed';
+        stepElement.textContent = `${i + 1}. ${step.name} - Completed`;
+        
+        // Wait before next step (except for last step)
+        if (i < chain.steps.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+        
+      } catch (error) {
+        // Mark as error
+        stepElement.className = 'chain-step-progress error';
+        stepElement.textContent = `${i + 1}. ${step.name} - Error: ${error.message}`;
+        console.error('Chain step error:', error);
+        break;
+      }
+    }
+    
+    // Hide progress after completion
+    setTimeout(() => {
+      progressContainer.classList.remove('active');
+    }, 5000);
+    
+  } catch (error) {
+    console.error('Chain execution error:', error);
+    alert('Error running chain: ' + error.message);
+  }
 };
 
-window.deleteChain = function(id) {
-  alert('Delete chain functionality coming soon!');
+window.duplicateChain = async function(id) {
+  const chain = promptChains.find(c => c.id === id);
+  if (chain) {
+    const newChain = {
+      ...chain,
+      id: `chain-${Date.now()}`,
+      name: chain.name + ' (Copy)',
+      created: Date.now(),
+      updated: Date.now()
+    };
+    promptChains.push(newChain);
+    await chrome.storage.local.set({ promptChains });
+    renderPromptChains();
+  }
+};
+
+window.deleteChain = async function(id) {
+  if (confirm('Are you sure you want to delete this prompt chain?')) {
+    promptChains = promptChains.filter(c => c.id !== id);
+    await chrome.storage.local.set({ promptChains });
+    renderPromptChains();
+  }
 };
 
 window.toggleFavorite = async function(id) {
