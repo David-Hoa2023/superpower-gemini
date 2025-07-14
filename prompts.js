@@ -69,20 +69,21 @@ function setupEventListeners() {
       document.getElementById(tabId).classList.add('active');
       
       // Render appropriate content
-      switch(tabId) {
-        case 'my-prompts':
-          renderMyPrompts();
-          break;
-        case 'public-prompts':
-          renderPublicPrompts();
-          break;
-        case 'prompt-chains':
-          renderPromptChains();
-          break;
-        case 'history':
-          renderHistory();
-          break;
-      }
+    
+    switch(tabId) {
+      case 'my-prompts':
+        renderMyPrompts();
+        break;
+      case 'public-prompts':
+        renderPublicPrompts();
+        break;
+      case 'prompt-chains':
+        renderPromptChains();
+        break;
+      case 'history':
+        renderHistory();
+        break;
+    }
     });
   });
   
@@ -430,6 +431,7 @@ async function savePrompt(e) {
 }
 
 window.editPrompt = function(id) {
+  console.log('Edit prompt called with id:', id);
   const prompt = prompts.find(p => p.id === id);
   if (prompt) {
     currentEditingPrompt = id;
@@ -438,6 +440,7 @@ window.editPrompt = function(id) {
 };
 
 window.duplicatePrompt = async function(id) {
+  console.log('Duplicate prompt called with id:', id);
   const prompt = prompts.find(p => p.id === id);
   if (prompt) {
     const newPrompt = {
@@ -710,172 +713,3 @@ function handleFilter(e) {
   }
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// Function to find the best Gemini tab to use
-async function findBestGeminiTab() {
-  try {
-    // Get current window information
-    const currentWindow = await chrome.windows.getCurrent();
-    
-    // First, try to find Gemini tabs in the current window
-    const sameWindowGeminiTabs = await chrome.tabs.query({ 
-      url: 'https://gemini.google.com/*',
-      windowId: currentWindow.id
-    });
-    
-    if (sameWindowGeminiTabs.length > 0) {
-      // Prefer the active tab in current window
-      const activeTab = sameWindowGeminiTabs.find(tab => tab.active);
-      return activeTab || sameWindowGeminiTabs[0];
-    }
-    
-    // If no Gemini tabs in current window, find any Gemini tab
-    const allGeminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
-    
-    if (allGeminiTabs.length > 0) {
-      // Prefer active tabs
-      const activeGeminiTab = allGeminiTabs.find(tab => tab.active);
-      return activeGeminiTab || allGeminiTabs[0];
-    }
-    
-    return null;
-  } catch (error) {
-    console.warn('Error finding Gemini tab:', error);
-    // Fallback to simple query
-    const tabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
-    return tabs.length > 0 ? tabs[0] : null;
-  }
-}
-
-// Function to inject directly into page when content script fails
-function insertPromptDirectly(prompt) {
-  console.log('Direct injection attempt with prompt:', prompt);
-  
-  // Multiple selectors to find Gemini's input field
-  const selectors = [
-    'textarea[placeholder*="Enter a prompt"]',
-    'textarea[placeholder*="message"]',
-    'div[contenteditable="true"][role="textbox"]',
-    'div[contenteditable="true"][data-placeholder]',
-    'textarea',
-    '[contenteditable="true"]',
-    'div[role="textbox"]',
-    'input[type="text"]'
-  ];
-  
-  let inputField = null;
-  for (const selector of selectors) {
-    inputField = document.querySelector(selector);
-    if (inputField) {
-      console.log('Found input field with selector:', selector, inputField);
-      break;
-    }
-  }
-  
-  if (!inputField) {
-    // Last resort: look for any visible input-like element
-    const allInputs = document.querySelectorAll('textarea, input, [contenteditable="true"]');
-    for (const el of allInputs) {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0 && !el.disabled && !el.readonly) {
-        inputField = el;
-        console.log('Found visible input field:', inputField);
-        break;
-      }
-    }
-  }
-  
-  if (inputField) {
-    console.log('Inserting into field:', inputField.tagName, inputField);
-    
-    // Clear existing content first
-    if (inputField.tagName === 'TEXTAREA' || inputField.tagName === 'INPUT') {
-      inputField.value = '';
-    } else {
-      inputField.textContent = '';
-      inputField.innerHTML = '';
-    }
-    
-    // Wait a moment then insert
-    setTimeout(() => {
-      if (inputField.tagName === 'TEXTAREA' || inputField.tagName === 'INPUT') {
-        inputField.value = prompt;
-      } else {
-        // For contenteditable divs
-        inputField.textContent = prompt;
-        if (!inputField.textContent) {
-          inputField.innerHTML = prompt.replace(/\n/g, '<br>');
-        }
-      }
-      
-      // Focus first
-      inputField.focus();
-      
-      // Trigger comprehensive events
-      const events = [
-        new Event('focus', { bubbles: true }),
-        new Event('input', { bubbles: true }),
-        new Event('change', { bubbles: true }),
-        new Event('keyup', { bubbles: true }),
-        new Event('keydown', { bubbles: true }),
-        new Event('paste', { bubbles: true }),
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
-        new KeyboardEvent('keyup', { key: 'Enter', bubbles: true })
-      ];
-      
-      events.forEach(event => {
-        try {
-          inputField.dispatchEvent(event);
-        } catch (e) {
-          console.warn('Event dispatch failed:', e);
-        }
-      });
-      
-      // Also try InputEvent with more detail
-      try {
-        const inputEvent = new InputEvent('input', {
-          bubbles: true,
-          cancelable: true,
-          inputType: 'insertText',
-          data: prompt
-        });
-        inputField.dispatchEvent(inputEvent);
-      } catch (e) {
-        console.warn('InputEvent failed:', e);
-      }
-      
-      // Set cursor position
-      setTimeout(() => {
-        inputField.focus();
-        if (inputField.tagName === 'TEXTAREA' || inputField.tagName === 'INPUT') {
-          inputField.setSelectionRange(inputField.value.length, inputField.value.length);
-        } else {
-          // For contenteditable, move cursor to end
-          try {
-            const range = document.createRange();
-            const selection = window.getSelection();
-            range.selectNodeContents(inputField);
-            range.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(range);
-          } catch (e) {
-            console.warn('Could not set cursor position:', e);
-          }
-        }
-      }, 50);
-      
-    }, 50);
-    
-    console.log('Prompt insertion initiated');
-    return true;
-  } else {
-    console.warn('No input field found for direct injection');
-    console.log('Available elements:', document.querySelectorAll('textarea, input, [contenteditable="true"]'));
-    return false;
-  }
-}

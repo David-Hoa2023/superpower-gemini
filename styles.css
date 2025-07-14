@@ -151,6 +151,45 @@
   align-items: center;
 }
 
+.sp-prompts-tabs {
+  display: flex;
+  border-bottom: 1px solid #333;
+  background: #222;
+}
+
+.sp-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #999;
+  padding: 12px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+
+.sp-tab:hover {
+  background: #2a2a2a;
+  color: #ccc;
+}
+
+.sp-tab.active {
+  color: #4285f4;
+  border-bottom-color: #4285f4;
+  background: #1e1e1e;
+}
+
+.sp-tab-content {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sp-tab-content.active {
+  display: block;
+}
+
 #sp-close-prompts {
   background: none;
   border: none;
@@ -166,6 +205,366 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+}
+
+.sp-prompt-item {
+  background: #2a2a2a;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #333;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sp-prompt-checkbox {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 2px;
+  min-width: 20px;
+}
+
+.sp-prompt-select {
+  margin: 0;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #4285f4;
+  background: #2a2a2a;
+  border: 1px solid #666;
+  border-radius: 3px;
+}
+
+.sp-prompt-select:checked {
+  background: #4285f4;
+  border-color: #4285f4;
+}
+
+.sp-prompt-content {
+  flex: 1;
+}
+
+.sp-prompt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sp-prompt-header h4 {
+  margin: 0;
+  color: #e0e0e0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sp-prompt-category {
+  background: #444;
+  color: #ccc;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.sp-prompt-template {
+  color: #bbb;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+  max-height: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-prompt-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sp-prompt-actions button {
+  background: #4285f4;
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sp-prompt-actions button:hover {
+  background: #3367d6;
+}
+
+.sp-prompt-edit {
+  background: #666 !important;
+}
+
+.sp-prompt-edit:hover {
+  background: #555 !important;
+}
+
+.sp-public-list, .sp-chains-list, .sp-history-list {
+  padding: 16px;
+}
+
+.sp-prompt-meta {
+  color: #888;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.sp-prompt-import {
+  background: #34a853 !important;
+}
+
+.sp-prompt-import:hover {
+  background: #2d8e47 !important;
+}
+
+.sp-history-item {
+  background: #2a2a2a;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px solid #333;
+}
+
+.sp-history-text {
+  color: #bbb;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.sp-history-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sp-prompts-actions {
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1a1a1a;
+}
+
+.sp-actions-left {
+  display: flex;
+  gap: 8px;
+}
+
+.sp-actions-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sp-action-btn {
+  background: #4285f4;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.sp-action-btn:hover {
+  background: #3367d6;
+}
+
+.sp-action-btn:nth-child(2) {
+  background: #34a853;
+}
+
+.sp-action-btn:nth-child(2):hover {
+  background: #2d8e47;
+}
+
+.sp-action-btn:nth-child(3) {
+  background: #ea4335;
+}
+
+.sp-action-btn:nth-child(3):hover {
+  background: #d93025;
+}
+
+.sp-action-btn:nth-child(4) {
+  background: #ff9800;
+}
+
+.sp-action-btn:nth-child(4):hover {
+  background: #f57c00;
+}
+
+.sp-action-btn:nth-child(5) {
+  background: #f44336;
+}
+
+.sp-action-btn:nth-child(5):hover {
+  background: #d32f2f;
+}
+
+.sp-action-btn:disabled {
+  background: #555 !important;
+  color: #888 !important;
+  cursor: not-allowed;
+}
+
+.sp-prompt-delete {
+  background: #f44336 !important;
+}
+
+.sp-prompt-delete:hover {
+  background: #d32f2f !important;
+}
+
+.sp-select-all-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #e0e0e0;
+  font-size: 12px;
+  cursor: pointer;
+  margin: 0;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+}
+
+.sp-select-all-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: #4285f4;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Modal Styles */
+.sp-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10002;
+}
+
+.sp-modal-content {
+  background: #1e1e1e;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.sp-modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sp-modal-header h3 {
+  margin: 0;
+  color: #e0e0e0;
+}
+
+.sp-modal-close {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+}
+
+.sp-modal-body {
+  padding: 16px;
+}
+
+.sp-form-group {
+  margin-bottom: 16px;
+}
+
+.sp-form-group label {
+  display: block;
+  color: #e0e0e0;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.sp-form-group input,
+.sp-form-group select,
+.sp-form-group textarea {
+  width: 100%;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 8px;
+  color: #e0e0e0;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.sp-form-group textarea {
+  height: 100px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.sp-modal-footer {
+  padding: 16px;
+  border-top: 1px solid #333;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sp-btn-primary,
+.sp-btn-secondary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sp-btn-primary {
+  background: #4285f4;
+  color: white;
+}
+
+.sp-btn-primary:hover {
+  background: #3367d6;
+}
+
+.sp-btn-secondary {
+  background: #444;
+  color: #e0e0e0;
+}
+
+.sp-btn-secondary:hover {
+  background: #555;
 }
 
 /* Floating Action Buttons */

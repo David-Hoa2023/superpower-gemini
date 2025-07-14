@@ -82,29 +82,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Action buttons
   document.getElementById('manage-prompts').addEventListener('click', async () => {
     try {
-      // Find current window and any existing Gemini tabs
-      const currentWindow = await chrome.windows.getCurrent();
-      const geminiTabs = await chrome.tabs.query({ 
-        url: 'https://gemini.google.com/*',
-        windowId: currentWindow.id 
-      });
+      // Find the best Gemini tab to use
+      const geminiTab = await findBestGeminiTab();
       
-      let targetWindowId = currentWindow.id;
-      
-      // If no Gemini tabs in current window, find any Gemini tab
-      if (geminiTabs.length === 0) {
-        const allGeminiTabs = await chrome.tabs.query({ url: 'https://gemini.google.com/*' });
-        if (allGeminiTabs.length > 0) {
-          targetWindowId = allGeminiTabs[0].windowId;
+      if (geminiTab) {
+        try {
+          // Send message to content script to show prompt manager overlay
+          const response = await chrome.tabs.sendMessage(geminiTab.id, {
+            action: 'togglePromptManager'
+          });
+          
+          if (response && response.success) {
+            // Focus the Gemini window and tab
+            await chrome.windows.update(geminiTab.windowId, { focused: true });
+            await chrome.tabs.update(geminiTab.id, { active: true });
+          } else {
+            console.warn('Content script failed to toggle prompt manager, falling back to new tab');
+            chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
+          }
+        } catch (messageError) {
+          console.warn('Failed to send message to content script, falling back to new tab:', messageError);
+          chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
         }
+      } else {
+        // Fallback: create new tab with prompts page if no Gemini tab found
+        chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
       }
-      
-      // Create prompts tab in the same window as Gemini
-      chrome.tabs.create({ 
-        url: chrome.runtime.getURL('prompts.html'),
-        windowId: targetWindowId
-      });
     } catch (error) {
+      console.error('Error opening prompts:', error);
       // Fallback to creating in current window
       chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
     }

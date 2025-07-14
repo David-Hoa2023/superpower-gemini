@@ -181,7 +181,6 @@ function captureAndSendScreenshot(tab) {
       }
     });
   });
-  });
 }
 
 // Send selected text with custom prompt

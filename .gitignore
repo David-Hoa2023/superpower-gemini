@@ -31,3 +31,6 @@ node_modules/
 # Backup files
 *.backup
 *.bak
+
+# ClaudPoint checkpoint system
+.checkpoints/
